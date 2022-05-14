@@ -8,7 +8,13 @@ type WrapIntoThreads<Types> = {
     [K in keyof Types]: ThreadJob<Types[K]>[];
 };
 
+type WrapIntoStatuses<Types> = {
+    [K in keyof Types]: boolean;
+};
+
 class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>> {
+    public readonly main = Symbol("JobQueue#main");
+
     private running = false;
 
     private terminate = false;
@@ -23,6 +29,8 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
 
     private states = {} as Threads;
 
+    private halted = {} as WrapIntoStatuses<Threads>;
+
     public constructor(private readonly delay: number) {}
 
     private queue: (Job | ThreadJob)[] = [];
@@ -33,7 +41,9 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
                 return this;
             },
             next: async () => {
-                const value = this.queue.shift() ?? this.noop;
+                const index = this.queue.findIndex((job) => !this.halted[(job as any).thread]);
+
+                const [value] = index === -1 ? [this.noop] : this.queue.splice(index, 1);
 
                 const { thread } = value as any;
 
@@ -58,37 +68,54 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
         };
     }
 
-    public async start() {
-        if (this.running) throw new Error("JobQueue is already running.");
+    public async start(thread?: keyof Threads) {
+        if (typeof thread !== "undefined") {
+            if (!this.halted[thread]) throw new Error(`JobQueue thread '${String(thread)}' is already running.`);
 
-        this.running = true;
+            this.halted[thread] = false;
+        } else {
+            if (this.running) throw new Error("JobQueue is already running.");
 
-        for await (const job of this.generator()) {
-            if (this.terminate) break;
+            this.running = true;
 
-            const { thread } = job as any;
+            for await (const job of this.generator()) {
+                if (this.terminate) break;
 
-            if (thread) {
-                if (!(thread in this.states)) throw new Error(`JobQueue state for thread '${thread}' was not initialized.`);
+                const { thread } = job as any;
 
-                const state = this.states[thread as keyof Threads];
+                if (thread) {
+                    if (!(thread in this.states)) throw new Error(`JobQueue state for thread '${String(thread)}' was not initialized.`);
 
-                const updated = await job.call(null, state);
+                    const state = this.states[thread as keyof Threads];
 
-                if (this.resetted) this.resetted = false;
-                else this.states[thread as keyof Threads] = updated;
-            } else {
-                await job.call(null, undefined);
+                    const updated = await job.call(null, state);
+
+                    if (this.resetted) this.resetted = false;
+                    else this.states[thread as keyof Threads] = updated;
+                } else {
+                    await job.call(null, undefined);
+                }
             }
+
+            this.terminate = false;
+
+            this.running = false;
         }
-
-        this.terminate = false;
-
-        this.running = false;
     }
 
-    public async stop() {
-        this.terminate = true;
+    public async stop(thread?: keyof Threads) {
+        if (typeof thread !== "undefined") {
+            if (this.halted[thread]) throw new Error(`JobQueue thread '${String(thread)}' is already paused.`);
+
+            this.halted[thread] = true;
+        } else this.terminate = true;
+
+        //
+        // if (typeof thread !== "undefined") {
+        //     return (this.halted[thread] = true);
+        // }
+
+        // return (this.terminate = true);
     }
 
     public job(task: Job): this;
