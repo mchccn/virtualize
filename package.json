@@ -1,15 +1,23 @@
 {
-  "name": "virtualize",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "kelly <cursors.owo.uwu@gmail.com>",
-  "license": "MIT",
-  "devDependencies": {
-    "typescript": "^4.6.4"
-  }
+    "name": "virtualize",
+    "version": "1.0.0",
+    "description": "> Fuck single-threaded JavaScript: virtualize the event loop.",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "kelly <cursors.owo.uwu@gmail.com>",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^4.6.4"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kelsny/virtualize.git"
+    },
+    "bugs": {
+        "url": "https://github.com/kelsny/virtualize/issues"
+    },
+    "homepage": "https://github.com/kelsny/virtualize#readme"
 }

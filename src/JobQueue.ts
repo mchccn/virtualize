@@ -1,3 +1,5 @@
+// work on shit
+
 type Job = () => Promise<any>;
 
 type ThreadJob<Context = any> = (ctx: Context) => Promise<Context>;
