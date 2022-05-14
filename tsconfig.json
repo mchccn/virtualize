@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "esnext",
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "module": "commonjs",
@@ -13,14 +13,14 @@
         "noImplicitAny": true,
         "noImplicitThis": true,
         "alwaysStrict": true,
-        "noUnusedParameters": true,
         "noImplicitReturns": true,
         "noFallthroughCasesInSwitch": true,
+        "importsNotUsedAsValues": "error",
         "skipLibCheck": true,
         "lib": ["esnext", "esnext.asynciterable"],
         "types": ["node"],
         "typeRoots": ["./src/typings"]
     },
-    "exclude": ["node_modules"],
+    "exclude": ["node_modules", "dist"],
     "include": ["src/**/*.ts"]
 }

@@ -1,18 +1,11 @@
+import type { MainJob, Thread, ThreadJob, ThreadsData } from "./jobs";
 import * as json from "./json";
+import { MessageQueue } from "./MessageQueue";
+import type { ExtractMessageTypes, WrapIntoStatuses, WrapIntoThreads } from "./wrappers";
 
-type Job = () => Promise<any>;
+export class JobQueue<Threads extends ThreadsData = ThreadsData> {
+    private mq = new MessageQueue<ExtractMessageTypes<Threads>>();
 
-type ThreadJob<Context = any> = (ctx: Context) => Promise<Context>;
-
-type WrapIntoThreads<Types> = {
-    [K in keyof Types]: ThreadJob<Types[K]>[];
-};
-
-type WrapIntoStatuses<Types> = {
-    [K in keyof Types]: boolean;
-};
-
-class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>> {
     public readonly main = Symbol("JobQueue#main");
 
     private running = false;
@@ -33,9 +26,20 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
 
     public constructor(private readonly delay: number) {}
 
-    private queue: (Job | ThreadJob)[] = [];
+    private queue: (MainJob | ThreadJob)[] = [];
 
-    private generator(): AsyncGenerator<Job | ThreadJob, never, undefined> {
+    private thread(thread: keyof Threads): Thread<Threads> {
+        return {
+            message: (target, data) => {
+                this.mq.send(thread, target, data);
+            },
+            receive: () => {
+                return this.mq.receive(thread);
+            },
+        };
+    }
+
+    private generator(): AsyncGenerator<MainJob | ThreadJob, never, undefined> {
         return {
             [Symbol.asyncIterator]() {
                 return this;
@@ -88,12 +92,12 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
 
                     const state = this.states[thread as keyof Threads];
 
-                    const updated = await job.call(null, state);
+                    const updated = await (job as unknown as ThreadJob<Threads>).call(null, this.thread(thread), state);
 
                     if (this.resetted) this.resetted = false;
-                    else this.states[thread as keyof Threads] = updated;
+                    else this.states[thread as keyof Threads] = json.clone(updated);
                 } else {
-                    await job.call(null, undefined);
+                    await (job as unknown as MainJob<Threads>).call(null, this.thread(thread));
                 }
             }
 
@@ -118,9 +122,9 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
         // return (this.terminate = true);
     }
 
-    public job(task: Job): this;
-    public job<Thread extends keyof Threads, Context = Threads[Thread]>(thread: Thread, task: ThreadJob<Context>): this;
-    public job(...args: [string, ThreadJob] | [Job]): this {
+    public job(task: MainJob): this;
+    public job<Thread extends keyof Threads, Context extends Threads[Thread][0] = Threads[Thread][0]>(thread: Thread, task: ThreadJob<Threads, Context>): this;
+    public job(...args: [string, ThreadJob<any, any>] | [MainJob]): this {
         if (args.length === 1) {
             const [task] = args;
 
@@ -140,7 +144,7 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
         return this;
     }
 
-    public init<Thread extends keyof Threads, Context extends Threads[Thread]>(thread: Thread, context: Context) {
+    public init<Thread extends keyof Threads, Context extends Threads[Thread]>(thread: Thread, context: Context[0]) {
         if (thread in this.states) throw new Error(`JobQueue state for thread '${String(thread)}' already initialized.`);
 
         if (!json.serializable(context)) throw new Error(`JobQueue thread state can only be JSON-serializable data.`);
@@ -164,21 +168,33 @@ class JobQueue<Threads extends Record<string, unknown> = Record<string, unknown>
         this.resetted = true;
     }
 
+    public query(thread: keyof Threads) {
+        return this.halted[thread];
+    }
+
     public get active() {
         return this.running;
     }
 }
 
+/**
+ * make a builder api because this shit is verbose af
+ *
+ * new JobQueue<{
+ *     thread_name: [threadStateType, messageDataType];
+ *     ...
+ * }>
+ */
+
 const q = new JobQueue<{
-    side: { state: number };
+    side: [{ state: number }, never];
 }>(100);
 
 q.init("side", { state: 0 });
 
 setInterval(() => {
     if (q.active)
-        // q.query("side") to query status of thread
-        q.job("side", async (ctx) => {
+        q.job("side", async (_, ctx) => {
             // pass process object with methods to do stuff
             ctx.state++;
 

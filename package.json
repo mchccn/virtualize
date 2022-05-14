@@ -1,8 +1,8 @@
 {
     "name": "virtualize",
     "version": "1.0.0",
-    "description": "> Fuck single-threaded JavaScript: virtualize the event loop.",
-    "main": "index.js",
+    "description": "Fuck single-threaded JavaScript: virtualize the event loop.",
+    "main": "dist/index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },
