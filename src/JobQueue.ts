@@ -2,6 +2,7 @@ import type { MainJob, Thread, ThreadJob, ThreadsData } from "./jobs";
 import * as json from "./json";
 import { MessageQueue } from "./MessageQueue";
 import { Mutex } from "./Mutex";
+import { Virtualize } from "./Virtualize";
 import type { ExtractMessageTypes, WrapIntoStatuses, WrapIntoThreads } from "./wrappers";
 
 export class JobQueue<Threads extends ThreadsData = ThreadsData> {
@@ -9,7 +10,7 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
         let id = 0;
 
         while (true) yield (Date.now() + id++).toString(36);
-    })().next;
+    })();
 
     private mq = new MessageQueue<ExtractMessageTypes<Threads>>();
 
@@ -130,7 +131,7 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
         task: ThreadJob<Threads, Context>
     ): string;
     public job(...args: [string, ThreadJob<any, any>] | [MainJob]): string {
-        const id = JobQueue.id().value;
+        const id = JobQueue.id.next().value;
 
         if (args.length === 1) {
             const [task] = args;
@@ -212,20 +213,15 @@ const m = new Mutex({
     console.log(resource());
 })();
 
-/**
- * make a builder api because this shit is verbose af
- *
- * new JobQueue<{
- *     thread_name: [threadStateType, messageDataType];
- *     ...
- * }>
- */
+// const q = new JobQueue<{
+//     side: [{ state: number }, never];
+// }>(100);
 
-const q = new JobQueue<{
-    side: [{ state: number }, never];
-}>(100);
+// q.init("side", { state: 0 });
 
-q.init("side", { state: 0 });
+const q = Virtualize.queue()
+    .define("side", { state: 0 }, null! as never)
+    .finalize(100);
 
 setInterval(() => {
     if (q.active)
