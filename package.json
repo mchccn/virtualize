@@ -1,5 +1,5 @@
 {
-    "name": "virtualize",
+    "name": "@kelsny/virtualize",
     "version": "1.0.0",
     "description": "Fuck single-threaded JavaScript: virtualize the event loop.",
     "main": "dist/index.js",

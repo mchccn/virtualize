@@ -9,7 +9,9 @@ export class MessageQueue<Messages extends Record<string, unknown> = Record<stri
         this.map[target].push({ from, data } as WrapIntoQueue<Messages>[Target][number]);
     }
 
-    public receive<Target extends keyof Messages>(target: keyof Messages): WrapIntoQueue<Messages>[Target][number] | undefined {
+    public receive<Target extends keyof Messages>(
+        target: keyof Messages
+    ): WrapIntoQueue<Messages>[Target][number] | undefined {
         const queue = this.map[target];
 
         if (!queue) return;

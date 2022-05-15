@@ -1,9 +1,16 @@
 import type { MainJob, Thread, ThreadJob, ThreadsData } from "./jobs";
 import * as json from "./json";
 import { MessageQueue } from "./MessageQueue";
+import { Mutex } from "./Mutex";
 import type { ExtractMessageTypes, WrapIntoStatuses, WrapIntoThreads } from "./wrappers";
 
 export class JobQueue<Threads extends ThreadsData = ThreadsData> {
+    private static id = (function* () {
+        let id = 0;
+
+        while (true) yield (Date.now() + id++).toString(36);
+    })().next;
+
     private mq = new MessageQueue<ExtractMessageTypes<Threads>>();
 
     public readonly main = Symbol("JobQueue#main");
@@ -31,6 +38,8 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
     private thread(thread: keyof Threads): Thread<Threads> {
         return {
             message: (target, data) => {
+                if (target === thread) throw new Error(`JobQueue thread cannot send message to itself.`);
+
                 this.mq.send(thread, target, data);
             },
             receive: () => {
@@ -113,22 +122,22 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
 
             this.halted[thread] = true;
         } else this.terminate = true;
-
-        //
-        // if (typeof thread !== "undefined") {
-        //     return (this.halted[thread] = true);
-        // }
-
-        // return (this.terminate = true);
     }
 
-    public job(task: MainJob): this;
-    public job<Thread extends keyof Threads, Context extends Threads[Thread][0] = Threads[Thread][0]>(thread: Thread, task: ThreadJob<Threads, Context>): this;
-    public job(...args: [string, ThreadJob<any, any>] | [MainJob]): this {
+    public job(task: MainJob): string;
+    public job<Thread extends keyof Threads, Context extends Threads[Thread][0] = Threads[Thread][0]>(
+        thread: Thread,
+        task: ThreadJob<Threads, Context>
+    ): string;
+    public job(...args: [string, ThreadJob<any, any>] | [MainJob]): string {
+        const id = JobQueue.id().value;
+
         if (args.length === 1) {
             const [task] = args;
 
             Reflect.defineProperty(task, "thread", { value: undefined });
+
+            Reflect.defineProperty(task, "id", { value: id });
 
             this.queue.push(task);
         } else {
@@ -136,12 +145,14 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
 
             Reflect.defineProperty(task, "thread", { value: thread });
 
+            Reflect.defineProperty(task, "id", { value: id });
+
             this.threads[thread as keyof Threads] = (this.threads[thread as keyof Threads] ?? []).concat(task);
 
             this.queue.push(task);
         }
 
-        return this;
+        return id;
     }
 
     public init<Thread extends keyof Threads, Context extends Threads[Thread]>(thread: Thread, context: Context[0]) {
@@ -168,6 +179,10 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
         this.resetted = true;
     }
 
+    public cancel(...ids: string[]) {
+        this.queue = this.queue.filter((j) => !ids.includes((j as any).id));
+    }
+
     public query(thread: keyof Threads) {
         return this.halted[thread];
     }
@@ -176,6 +191,26 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
         return this.running;
     }
 }
+
+// demo
+
+const m = new Mutex({
+    state: 0,
+});
+
+(async () => {
+    let [done, resource] = await m.request();
+
+    console.log(done, resource());
+
+    resource().$.state++;
+
+    done();
+
+    [, resource] = await m.request();
+
+    console.log(resource());
+})();
 
 /**
  * make a builder api because this shit is verbose af
@@ -195,13 +230,12 @@ q.init("side", { state: 0 });
 setInterval(() => {
     if (q.active)
         q.job("side", async (_, ctx) => {
-            // pass process object with methods to do stuff
             ctx.state++;
 
             console.log(ctx);
 
             if (ctx.state >= 3) {
-                q.stop(); // api to only start and stop a specific thread
+                q.stop();
 
                 q.reset();
 

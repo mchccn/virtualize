@@ -15,8 +15,9 @@
     -   [x] jobq start/stop individual threads
     -   [x] jobq query status of thread
     -   [x] jobq message queue between threads
-    -   [ ] jobq cancel job
-    -   [ ] jobq mutex lock/unlock
+    -   [x] jobq cancel job
+    -   [x] jobq mutex lock/unlock
+    -   [ ] catch intentionally thrown errors
     -   [ ] jobq plugin system (superjson)
 
 -   `Virtualized`
