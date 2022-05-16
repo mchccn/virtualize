@@ -102,6 +102,12 @@ export class JobQueue<Threads extends ThreadsData = ThreadsData> {
 
                     const state = this.states[thread as keyof Threads];
 
+                    // it should not wait for the job to complete. while the job is completing, it should fetch another job from a different thread if possible
+
+                    // job.call(null, this.thread(thread), state).then((updated) => { ... })
+
+                    // check if another job is availble
+
                     const updated = await (job as unknown as ThreadJob<Threads>).call(null, this.thread(thread), state);
 
                     if (this.resetted) this.resetted = false;
@@ -222,6 +228,8 @@ const m = new Mutex({
 const q = Virtualize.queue()
     .define("side", { state: 0 }, null! as never)
     .finalize(100);
+
+Virtualize.interval(q, () => console.log("hi"), 1000);
 
 setInterval(() => {
     if (q.active)

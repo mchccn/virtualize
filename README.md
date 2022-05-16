@@ -6,7 +6,7 @@
 
 -   `/`
 
-    -   [ ] builder api to make creating a jobq not a pita
+    -   [x] builder api to make creating a jobq not a pita
 
 -   `JobQueue` - delegates tasks to virtual threads easily
 
@@ -22,4 +22,4 @@
 
 -   `Virtualized`
 
-    -   [ ] virtualized setInterval and setTimeout
+    -   [x] virtualized setInterval and setTimeout

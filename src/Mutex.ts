@@ -1,4 +1,3 @@
-// ! do this shit later cuz i have no idea how
 export class Mutex<Resource> {
     private queue: Promise<void>[] = [];
 
